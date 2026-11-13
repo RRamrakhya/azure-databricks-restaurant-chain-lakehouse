@@ -1,0 +1,15 @@
+{
+  "$comment": "Data contract for POS order events. Version bump on any breaking change.",
+  "contract_version": "1.0.0",
+  "required": ["order_id", "customer_id", "restaurant_id", "order_timestamp", "total_amount", "items", "order_type", "status"],
+  "properties": {
+    "order_id": {"type": "string", "min_length": 1},
+    "customer_id": {"type": "string", "min_length": 1},
+    "restaurant_id": {"type": "string", "min_length": 1},
+    "order_timestamp": {"type": "string", "format": "iso8601"},
+    "total_amount": {"type": "number", "exclusive_minimum": 0},
+    "items": {"type": "string", "format": "json_array_nonempty"},
+    "order_type": {"type": "string", "enum": ["dine-in", "takeaway", "delivery"]},
+    "status": {"type": "string", "enum": ["completed", "cancelled", "pending"]}
+  }
+}

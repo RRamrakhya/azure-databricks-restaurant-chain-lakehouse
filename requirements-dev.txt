@@ -1,0 +1,3 @@
+ruff
+pytest
+azure-eventhub   # only needed for --mode eventhub

@@ -1,0 +1,53 @@
+# Databricks Asset Bundle.
+# Deploy: databricks bundle deploy -t dev --var="ai_endpoint=<your-serving-endpoint>,alert_email=<address>"
+bundle:
+  name: restaurant_lakehouse
+
+variables:
+  catalog: {default: restaurant_catalog}
+  ai_endpoint: {description: "Model serving endpoint name available in your workspace"}
+  source_mode: {default: files}
+  alert_email: {description: "Address for failure notifications (pass with --var)"}
+
+resources:
+  pipelines:
+    p_ingest_silver:
+      name: restaurant_ingest_silver_${bundle.target}
+      catalog: ${var.catalog}
+      schema: silver
+      serverless: true
+      continuous: false          # triggered: consumes all available data then stops (cost-effective, completes)
+      configuration:
+        source_mode: ${var.source_mode}
+      libraries:
+        - file: {path: src/pipelines/01_bronze_live_orders.py}
+        - file: {path: src/pipelines/02_silver_dimensions.py}
+        - file: {path: src/pipelines/03_silver_facts.py}
+        - file: {path: src/pipelines/04_silver_reviews_ai.sql}
+    p_gold:
+      name: restaurant_gold_${bundle.target}
+      catalog: ${var.catalog}
+      schema: gold
+      serverless: true
+      configuration:
+        ai_endpoint: ${var.ai_endpoint}
+      libraries:
+        - file: {path: src/pipelines/05_gold.sql}
+
+  jobs:
+    wf_daily_master:
+      name: wf_daily_master_${bundle.target}
+      schedule: {quartz_cron_expression: "0 0 2 * * ?", timezone_id: Asia/Kolkata}
+      email_notifications:
+        on_failure:
+          - ${var.alert_email}
+      tasks:
+        - task_key: ingest_and_silver
+          pipeline_task: {pipeline_id: "${resources.pipelines.p_ingest_silver.id}"}
+        - task_key: gold
+          depends_on: [{task_key: ingest_and_silver}]
+          pipeline_task: {pipeline_id: "${resources.pipelines.p_gold.id}"}
+
+targets:
+  dev:  {mode: development, default: true}
+  prod: {mode: production}
